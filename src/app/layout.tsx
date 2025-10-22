@@ -14,10 +14,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Static UUID for thread identification
+  const threadId = "a1b2c3d4-e5f6-7890-1234-56789abcdef0";
+
   return (
     <html lang="en">
       <body className={"antialiased"}>
-        <CopilotKit runtimeUrl="/api/copilotkit" agent="sample_agent">
+        <CopilotKit 
+          publicLicenseKey="ck_pub_0bf34e683d53cc9de242ba5ea8efe015"
+          runtimeUrl="/api/copilotkit" 
+          agent="sample_agent"
+          threadId={threadId}
+        >
           {children}
         </CopilotKit>
       </body>
