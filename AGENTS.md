@@ -2,6 +2,7 @@
 ## Mandatory setup before running the app
 - Always run `npm install` from the repository root before starting the frontend or backend services.
 - After installing npm dependencies, change into the `agent/` directory and run `poetry install` to ensure the Python backend environment is prepared.
+- Always run `npx playwright install` to be ready to execute e2e tests
 These steps are required each time the environment is initialized to guarantee all dependencies are available.
 
 ## End-to-end test requirements

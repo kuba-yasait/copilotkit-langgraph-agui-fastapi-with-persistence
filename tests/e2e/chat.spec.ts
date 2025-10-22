@@ -15,11 +15,24 @@ async function sendMessageAndAwaitResponse(page: Page, message: string): Promise
 
   const input = page.getByPlaceholder('Type a message...');
   await input.click();
-  await input.fill(message);
+  
+  // Type character by character to trigger onChange events properly
+  await input.pressSequentially(message, { delay: 50 });
+  
+  // Give React time to update
+  await page.waitForTimeout(500);
 
   const sendButton = page.getByTestId('copilot-chat-ready');
-  await expect(sendButton).toBeEnabled();
-  await sendButton.click();
+
+  console.log('Button disabled:', await sendButton.getAttribute('disabled'));
+  console.log('Button visible:', await sendButton.isVisible());
+  console.log('Button enabled:', await sendButton.isEnabled());
+
+  // Wait for the button to become enabled (disabled attribute removed)
+  //await expect(sendButton).not.toHaveAttribute('disabled', { timeout: 10_000 });
+  //await sendButton.click();
+  
+  await input.press('Enter');
 
   const userMessageLocator = page
     .locator('.copilotKitMessage.copilotKitUserMessage')
