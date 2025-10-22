@@ -63,55 +63,7 @@ export function extractAgentName(body: any): string | null {
 }
 
 /**
- * Parses AG-UI streaming response to extract messages and state
- */
-function parseAGUIStream(text: string): AgentState {
-  const messages: AGUIMessage[] = [];
-  const state: Record<string, any> = {};
-  
-  // Split by newlines to process each event
-  const lines = text.split('\n').filter(line => line.trim());
-  
-  for (const line of lines) {
-    try {
-      // AG-UI protocol sends JSON events
-      const event = JSON.parse(line);
-      
-      // Look for state events that contain messages
-      if (event.type === 'state' && event.state?.messages) {
-        // LangGraph messages format
-        const langGraphMessages = event.state.messages;
-        
-        for (const msg of langGraphMessages) {
-          // Convert LangGraph message to AG-UI format
-          const aguiMessage: AGUIMessage = {
-            id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-            role: msg.type === 'human' ? 'user' : 
-                  msg.type === 'ai' ? 'assistant' : 
-                  'system',
-            content: msg.content || '',
-            createdAt: msg.created_at || Date.now()
-          };
-          
-          messages.push(aguiMessage);
-        }
-      }
-      
-      // Extract any additional state
-      if (event.state) {
-        Object.assign(state, event.state);
-      }
-    } catch (parseError) {
-      // Skip malformed events
-      console.debug('Failed to parse AG-UI event:', parseError);
-    }
-  }
-  
-  return { messages, state };
-}
-
-/**
- * Loads agent state from FastAPI backend
+ * Loads agent state from FastAPI backend using custom /load_state endpoint
  */
 export async function loadStateFromAgent(
   agentUrl: string,
