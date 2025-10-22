@@ -57,9 +57,12 @@ async def log_requests(request: Request, call_next):
     # Process request
     response = await call_next(request)
     
-    # Log response
+    # Log response with more detail for errors
     duration = time.time() - start_time
-    print(f"<-- {request.method} {request.url.path} [{response.status_code}] {duration:.2f}s", flush=True)
+    if response.status_code >= 400:
+        print(f"<-- {request.method} {request.url.path} [{response.status_code}] {duration:.2f}s [ERROR]", flush=True)
+    else:
+        print(f"<-- {request.method} {request.url.path} [{response.status_code}] {duration:.2f}s", flush=True)
     
     return response
 
@@ -91,6 +94,72 @@ add_langgraph_fastapi_endpoint(
     ),
     path="/"
 )
+
+# Custom endpoint for state loading (workaround for AG-UI bug)
+# See PERSISTENCE_WORKAROUND.md for details
+from fastapi import HTTPException
+from pydantic import BaseModel
+from typing import List, Dict, Any
+
+class LoadStateRequest(BaseModel):
+    threadId: str
+
+class LoadStateResponse(BaseModel):
+    threadId: str
+    threadExists: bool
+    messages: List[Dict[str, Any]]
+    state: Dict[str, Any]
+
+@app.post("/load_state", response_model=LoadStateResponse)
+async def load_state(request: LoadStateRequest):
+    """
+    Custom endpoint to load conversation state from checkpointer.
+    
+    This is a workaround for CopilotKit AG-UI not properly querying
+    the agent for state on loadAgentState operations.
+    """
+    print(f"[LoadState] Loading state for thread: {request.threadId}", flush=True)
+    
+    if graph is None:
+        raise HTTPException(status_code=500, detail="Graph not initialized")
+    
+    try:
+        # Query the graph for the current state
+        config = {"configurable": {"thread_id": request.threadId}}
+        state = await graph.aget_state(config)
+        
+        # Extract messages from state
+        messages = []
+        if state and state.values and "messages" in state.values:
+            for msg in state.values["messages"]:
+                # Convert LangChain message format to simple dict
+                message_dict = {
+                    "id": getattr(msg, "id", f"msg-{len(messages)}"),
+                    "role": "user" if msg.type == "human" else "assistant" if msg.type == "ai" else "system",
+                    "content": msg.content,
+                }
+                messages.append(message_dict)
+        
+        thread_exists = len(messages) > 0
+        
+        print(f"[LoadState] Found {len(messages)} messages for thread {request.threadId}", flush=True)
+        
+        return LoadStateResponse(
+            threadId=request.threadId,
+            threadExists=thread_exists,
+            messages=messages,
+            state=state.values if state and state.values else {}
+        )
+    
+    except Exception as e:
+        print(f"[LoadState] Error loading state: {e}", flush=True)
+        # Return empty state on error (thread doesn't exist)
+        return LoadStateResponse(
+            threadId=request.threadId,
+            threadExists=False,
+            messages=[],
+            state={}
+        )
 
 def main():
     """Run the uvicorn server."""
