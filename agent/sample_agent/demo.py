@@ -20,6 +20,13 @@ from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import time
 
+# Apply monkey patch to fix ag-ui-langgraph automatic regeneration bug
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from monkey_patch_ag_ui_langgraph import apply_monkey_patch
+apply_monkey_patch()
+print("=== Monkey patch applied to ag-ui-langgraph ===", flush=True)
+
 # Global variable to hold the checkpointer and graph
 checkpointer_cm = None
 graph = None

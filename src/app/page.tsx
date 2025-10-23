@@ -2,10 +2,13 @@
 
 import { useCoAgent, useCopilotAction } from "@copilotkit/react-core";
 import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
-import { useState } from "react";
+import { TextMessage, MessageRole } from "@copilotkit/runtime-client-gql";
+import type { Message } from "@copilotkit/shared";
+import { useState, useEffect, useRef } from "react";
 
 export default function CopilotKitPage() {
   const [themeColor, setThemeColor] = useState("#6366f1");
+  const hasTriggeredPing = useRef(false);
 
   // 🪁 Frontend Actions: https://docs.copilotkit.ai/guides/frontend-actions
   useCopilotAction({
@@ -22,7 +25,7 @@ export default function CopilotKitPage() {
 
   return (
     <main style={{ "--copilot-kit-primary-color": themeColor } as CopilotKitCSSProperties}>
-      <YourMainContent themeColor={themeColor} />
+      <YourMainContent themeColor={themeColor} hasTriggeredPing={hasTriggeredPing} />
       <CopilotSidebar
         clickOutsideToClose={false}
         defaultOpen={true}
@@ -40,9 +43,9 @@ type AgentState = {
   proverbs: string[];
 }
 
-function YourMainContent({ themeColor }: { themeColor: string }) {
+function YourMainContent({ themeColor, hasTriggeredPing }: { themeColor: string, hasTriggeredPing: React.MutableRefObject<boolean> }) {
   // 🪁 Shared State: https://docs.copilotkit.ai/coagents/shared-state
-  const { state, setState } = useCoAgent<AgentState>({
+  const { state, setState, run } = useCoAgent<AgentState>({
     name: "sample_agent",
     initialState: {
       proverbs: [
@@ -50,6 +53,29 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
       ],
     },
   })
+
+  // 🔧 Workaround: Send empty message to trigger state load from agent
+  // This works around a bug where loadAgentState doesn't query the agent on mount
+  useEffect(() => {
+    if (!hasTriggeredPing.current && run) {
+      console.log('[App] 🔄 Sending empty message to trigger state load...');
+      // Give CopilotKit time to initialize
+      setTimeout(() => {
+        try {
+          run(() => {
+            return new TextMessage({
+              role: MessageRole.User,
+              content: null as unknown as string,
+            }) as Message;
+          });
+          console.log('[App] ✅ Empty message sent');
+        } catch (error) {
+          console.log('[App] ⚠️ Failed to send message:', error);
+        }
+      }, 1000);
+      hasTriggeredPing.current = true;
+    }
+  }, [run, hasTriggeredPing]);
 
   // 🪁 Frontend Actions: https://docs.copilotkit.ai/coagents/frontend-actions
   useCopilotAction({
